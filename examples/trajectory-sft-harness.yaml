@@ -1,0 +1,86 @@
+# Complete trajectory SFT recipe for the cleaned harness JSONL export.
+# Keep prompt_override null to preserve recorded instructions.
+# For another independent run, change prompt_override, prepared, and output.directory.
+# Set evaluation.task_ids to held-out IDs from harness.data_root/tasks.jsonl;
+# external SFT validation IDs may not exist in the SWEGemma evaluation dataset.
+model:
+  source: google/gemma-4-12B-it-qat-w4a16-ct
+  revision: main
+  local_files_only: false
+  attention: sdpa
+data:
+  format: harness_jsonl
+  train_file: ~/dev/kaggle/gemma-4-developer-agent_nemotron_v3.5/datasets/vishalxyzabc7527/gemma4-swe-agent-sft-harness/data/sft_train.jsonl
+  validation_file: ~/dev/kaggle/gemma-4-developer-agent_nemotron_v3.5/datasets/vishalxyzabc7527/gemma4-swe-agent-sft-harness/data/sft_val.jsonl
+  prompt_override: null
+  sequence_mode: trajectory
+  prepared: ../prepared/harness-trajectory-sft
+  verified_passing_only: true
+harness:
+  submission_dir: ~/dev/kaggle/gemma-4-developer-agent_nemotron_v3.5/sample_submission
+  data_root: ~/dev/kaggle/google_gemma-4
+  sandbox: subprocess
+objective:
+  name: sft
+  soft:
+    rstar: 0.5
+    top_k: 32
+    cache_dir: ./reference-cache
+runtime:
+  context_length: 32768
+adapter:
+  name: main_lora
+  rank_pattern:
+    q_proj: 12
+    k_proj: 8
+    v_proj: 8
+    o_proj: 12
+    gate_proj: 24
+    up_proj: 16
+    down_proj: 16
+  alpha_multiplier: 2.0
+  alpha_pattern: {}
+  dropout: 0.0
+  warm_start: null
+memory:
+  offload: cpu
+  cpu_offload_pin_memory: false
+  processes: 1
+  activation_checkpointing: true
+  loss_chunk_tokens: 128
+optimizer:
+  learning_rate: 0.0001
+  weight_decay: 0.0
+  max_grad_norm: 1.0
+  scheduler: cosine
+  warmup_ratio: 0.03
+training:
+  epochs: 1.0
+  microbatch_size: 1
+  gradient_accumulation: 8
+  seed: 42
+  save_steps: 1
+  eval_steps: 100
+  save_total_limit: 3
+  logging_steps: 1
+  tensorboard: false
+output:
+  directory: ../runs/harness-trajectory-sft
+progress:
+  enabled: true
+  heartbeat_seconds: 30
+evaluation:
+  compare_base: true
+  task_ids: null
+  port: 8000
+  tool_call_parser: gemma4
+  reasoning_parser: gemma4
+publish:
+  hf:
+    enabled: false
+    repo_id: null
+    mode: create
+  kaggle:
+    enabled: false
+    repo_id: null
+    mode: create

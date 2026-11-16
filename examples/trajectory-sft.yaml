@@ -1,0 +1,99 @@
+# All relative paths are resolved against THIS file, not your shell directory.
+# Hardware drivers and the matching CUDA/ROCm Torch build are installed separately.
+model:
+  source: google/gemma-4-12B-it-qat-w4a16-ct
+  revision: main  # Preparation resolves and records the immutable Hub commit.
+  local_files_only: false
+  attention: sdpa
+
+data:
+  sequence_mode: trajectory  # turn | trajectory | windowed; select via config init --regime.
+  window:
+    max_tokens: 8192  # Includes pinned system/task/schema, history, and targets.
+    history_tokens: 2048  # Recent complete exchanges, in addition to pinned context.
+  traces: ./teacher-traces  # ATIF JSON files, e.g. results/traces/trace_<task_id>.json
+  outcomes: ./teacher-results  # Contains task_results.jsonl, or the file itself.
+  prepared: ./prepared  # New directory; never overwrite an existing dataset.
+  verified_passing_only: true
+  validation_fraction: 0.1
+  seed: 42
+
+harness:
+  submission_dir: ~/dev/kaggle/gemma-4-developer-agent_nemotron_v3.5/sample_submission
+  data_root: null  # Evaluation only: directory with tasks/snapshots/graphs/etc.
+  sandbox: subprocess
+
+objective:
+  name: sft  # sft | soft; independent of sequence_mode.
+  soft:
+    rstar: 0.5  # Experimental starting value, not a tuned Gemma recommendation.
+    top_k: 32
+    cache_dir: ./reference-cache  # Immutable; run cache-reference before SoFT training.
+
+runtime:
+  context_length: 32768
+  # Completion (12288) / thinking (5120) come from the current sampling.yaml.
+  # The same numeric contract applies to teacher/student with their own tokenizers.
+
+adapter:
+  name: main_lora
+  rank_pattern:  # Set every value to the same rank for a uniform-rank experiment.
+    q_proj: 12
+    k_proj: 8
+    v_proj: 8
+    o_proj: 12
+    gate_proj: 24
+    up_proj: 16
+    down_proj: 16
+  alpha_multiplier: 2.0  # Standard alpha/r scaling; not rank-stabilized LoRA.
+  alpha_pattern: {}  # Optional per-projection alpha overrides.
+  dropout: 0.0
+  warm_start: null  # Adapter RELEASE directory; explicitly resets optimizer state.
+
+memory:
+  offload: none  # cpu or none; hardware profile selects the default. No auto-fallback.
+  processes: 2
+  activation_checkpointing: true
+  loss_chunk_tokens: 128
+
+optimizer:
+  learning_rate: 0.0001
+  weight_decay: 0.0
+  max_grad_norm: 1.0
+  scheduler: cosine
+  warmup_ratio: 0.03  # Fraction of optimizer steps; passed as TRL warmup_steps.
+
+training:
+  epochs: 1.0
+  microbatch_size: 1
+  gradient_accumulation: 8
+  seed: 42
+  save_steps: 1  # Long optimizer steps: save progress after every update.
+  eval_steps: 100
+  save_total_limit: 3
+  logging_steps: 1
+  tensorboard: false
+
+output:
+  directory: ./runs
+
+progress:
+  enabled: true  # tqdm for preparation and rank-zero training progress.
+  heartbeat_seconds: 30  # Report the current phase even before an optimizer step ends.
+
+evaluation:
+  compare_base: true
+  task_ids: null  # Defaults to the prepared validation task IDs.
+  port: 8000
+  tool_call_parser: gemma4
+  reasoning_parser: gemma4
+
+publish:
+  hf:
+    enabled: false  # Local only unless explicitly enabled.
+    repo_id: null  # owner/model-name; token comes from HF_TOKEN or hf auth.
+    mode: create
+  kaggle:
+    enabled: false
+    repo_id: null  # owner/dataset-name; credentials handled by Kaggle CLI.
+    mode: create  # Set version after the dataset has been created.

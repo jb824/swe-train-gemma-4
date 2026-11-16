@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swegemma-training"
+version = "0.1.0"
+description = "File-configured teacher-trace SFT and portable SWEGemma adapters"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = ["pydantic>=2.12,<3", "PyYAML>=6,<7", "typer>=0.20,<1", "tqdm>=4.67,<5", "numpy>=1.26", "safetensors>=0.7"]
+
+[project.optional-dependencies]
+train = ["torch>=2.13,<2.14", "transformers>=5.22.1,<5.23", "peft>=0.21.2,<0.22", "accelerate>=1.15,<1.16", "datasets>=5,<6", "trl>=1.17.1,<1.18", "compressed-tensors>=0.17,<0.18", "safetensors>=0.7"]
+publish = ["huggingface-hub>=1.33,<3", "kaggle>=2,<3"]
+tensorboard = ["tensorboard>=2.20"]
+test = ["pytest>=9,<10"]
+
+[project.scripts]
+swe-train = "swegemma_training.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+swegemma_training = ["templates/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
